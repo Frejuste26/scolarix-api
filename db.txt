@@ -1,0 +1,127 @@
+-- Script PostgreSQL pour créer la base de données Scolarix
+-- Date : 03 juin 2025
+-- Basé sur les modèles Sequelize affinés
+
+-- Suppression de la base de données si elle existe (pour un environnement de développement/test)
+DROP DATABASE IF EXISTS scolarix;
+
+-- Création de la base de données
+CREATE DATABASE scolarix
+    WITH
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'French_France.1252'
+    LC_CTYPE = 'French_France.1252'
+    TEMPLATE = template0;
+
+-- Connexion à la base de données (nécessite d'être exécuté séparément dans certains clients SQL)
+\c scolarix;
+
+-- Création des tables
+
+-- Table ecoles : Stocke les informations sur les établissements scolaires
+CREATE TABLE ecoles (
+    ecole_id VARCHAR(10) PRIMARY KEY, -- Renommé de ecoleId pour la cohérence snake_case
+    ecole_name VARCHAR(100) NOT NULL UNIQUE, -- Renommé de ecoleName et ajout de UNIQUE
+    iep VARCHAR(200),
+    ville VARCHAR(50), -- Renommé de Ville pour la cohérence snake_case
+    CONSTRAINT check_ecole_id_format CHECK (ecole_id ~ '^EC[0-9]{3}$')
+);
+
+-- Table users : Stocke les informations sur les utilisateurs (admin, enseignants)
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY, -- Renommé de userId pour la cohérence snake_case
+    username VARCHAR(50) NOT NULL UNIQUE,
+    mdpasse VARCHAR(255) NOT NULL, -- Correspond à password dans le modèle
+    user_role VARCHAR(20) NOT NULL CHECK (user_role IN ('Administrator', 'Teacher', 'OtherRole')) DEFAULT 'Teacher', -- Renommé de userRole, ajout de 'OtherRole' et DEFAULT
+    ecole_id VARCHAR(10) NOT NULL, -- Renommé de ecole pour la cohérence
+    last_login TIMESTAMP WITH TIME ZONE, -- Renommé de lastLogin et type ajusté
+    CONSTRAINT fk_user_ecole FOREIGN KEY (ecole_id) REFERENCES ecoles(ecole_id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT check_username_format CHECK (username ~ '^[a-zA-Z0-9_-]+$'),
+    CONSTRAINT check_username_length CHECK (LENGTH(username) >= 3 AND LENGTH(username) <= 50)
+);
+
+-- Table anneescolaire : Stocke les années scolaires
+CREATE TABLE anneescolaire (
+    code_anne VARCHAR(10) PRIMARY KEY, -- Renommé de codeAnne pour la cohérence snake_case
+    annee VARCHAR(20) NOT NULL UNIQUE, -- Ajout de UNIQUE
+    CONSTRAINT check_code_annee_format CHECK (code_anne ~ '^[0-9]{4}-[0-9]{4}$')
+);
+
+-- Table classes : Stocke les informations sur les classes, liée à une école
+CREATE TABLE classes (
+    classe_id VARCHAR(10) PRIMARY KEY, -- Renommé de classeId pour la cohérence snake_case
+    libelle VARCHAR(50) NOT NULL,
+    niveau VARCHAR(20) NOT NULL,
+    annee_code VARCHAR(10) NOT NULL, -- Renommé de annee pour la cohérence
+    ecole_id VARCHAR(10) NOT NULL, -- Renommé de ecole pour la cohérence
+    CONSTRAINT fk_classe_annee FOREIGN KEY (annee_code) REFERENCES anneescolaire(code_anne) ON DELETE RESTRICT,
+    CONSTRAINT fk_classe_ecole FOREIGN KEY (ecole_id) REFERENCES ecoles(ecole_id) ON DELETE RESTRICT,
+    CONSTRAINT uq_classe_libelle_annee_ecole UNIQUE (libelle, annee_code, ecole_id) -- Index unique composé
+);
+
+-- Table eleves : Stocke les informations sur les élèves, liée directement à une école et une classe
+CREATE TABLE eleves (
+    matricul VARCHAR(20) PRIMARY KEY UNIQUE, -- Ajout de UNIQUE explicite
+    last_name VARCHAR(50) NOT NULL, -- Renommé de lastname pour la cohérence snake_case
+    first_name VARCHAR(100) NOT NULL, -- Renommé de firstname pour la cohérence snake_case
+    genre CHAR(1) NOT NULL CHECK (genre IN ('M', 'F')),
+    classe_id VARCHAR(10) NOT NULL, -- Renommé de classe pour la cohérence
+    ecole_id VARCHAR(10) NOT NULL, -- Renommé de ecole pour la cohérence
+    CONSTRAINT fk_eleve_classe FOREIGN KEY (classe_id) REFERENCES classes(classe_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_eleve_ecole FOREIGN KEY (ecole_id) REFERENCES ecoles(ecole_id) ON DELETE RESTRICT
+);
+
+-- Table evaluations : Stocke les types d’évaluations (ex. Lecture, Maths)
+CREATE TABLE evaluations (
+    code_eva VARCHAR(10) PRIMARY KEY, -- Renommé de codeEva pour la cohérence snake_case
+    name_eva VARCHAR(50) NOT NULL UNIQUE, -- Renommé de nameEva et ajout de UNIQUE
+    coeficient FLOAT NOT NULL CHECK (coeficient > 0)
+);
+
+-- Table compositions : Stocke les compositions (ex. Mens.1, Compo Passage)
+CREATE TABLE compositions (
+    code_compo VARCHAR(10) PRIMARY KEY, -- Renommé de codeCompo pour la cohérence snake_case
+    libelle VARCHAR(50) NOT NULL,
+    date_compo DATE NOT NULL, -- Renommé de Date pour la cohérence snake_case
+    type_compo VARCHAR(20) NOT NULL CHECK (type_compo IN ('Mensuelle', 'Programme', 'Passage')), -- Renommé de typeCompo
+    annee_code VARCHAR(10) NOT NULL, -- Renommé de annee pour la cohérence
+    CONSTRAINT fk_compos_annee FOREIGN KEY (annee_code) REFERENCES anneescolaire(code_anne) ON DELETE RESTRICT,
+    CONSTRAINT uq_compo_libelle_type_annee UNIQUE (libelle, type_compo, annee_code) -- Index unique composé
+);
+
+-- Table notes : Stocke les notes des élèves pour chaque évaluation et période
+CREATE TABLE notes (
+    matricul_eleve VARCHAR(20), -- Renommé de eleve pour la cohérence
+    code_eva VARCHAR(10), -- Renommé de evaluation pour la cohérence
+    code_compo VARCHAR(10), -- Renommé de compos pour la cohérence
+    note FLOAT NOT NULL CHECK (note >= 0 AND note <= 10), -- Ajout de la contrainte max
+    PRIMARY KEY (matricul_eleve, code_eva, code_compo),
+    CONSTRAINT fk_note_eleve FOREIGN KEY (matricul_eleve) REFERENCES eleves(matricul) ON DELETE CASCADE,
+    CONSTRAINT fk_note_evaluation FOREIGN KEY (code_eva) REFERENCES evaluations(code_eva) ON DELETE RESTRICT,
+    CONSTRAINT fk_note_compo FOREIGN KEY (code_compo) REFERENCES compositions(code_compo) ON DELETE RESTRICT
+);
+
+-- Table moyennes : Stocke les moyennes des élèves par période et type
+CREATE TABLE moyennes (
+    matricul_eleve VARCHAR(20), -- Renommé de eleve pour la cohérence
+    code_compo VARCHAR(10), -- Renommé de compos pour la cohérence
+    moyenne FLOAT NOT NULL CHECK (moyenne >= 0 AND moyenne <= 10),
+    PRIMARY KEY (matricul_eleve, code_compo),
+    CONSTRAINT fk_moyenne_eleve FOREIGN KEY (matricul_eleve) REFERENCES eleves(matricul) ON DELETE CASCADE,
+    CONSTRAINT fk_moyenne_compo FOREIGN KEY (code_compo) REFERENCES compositions(code_compo) ON DELETE RESTRICT
+);
+
+-- Table resultats : Stocke les résultats finaux des élèves (Admis/Refusé, Rang)
+CREATE TABLE resultats ( -- Renommé de resultat pour la cohérence (pluriel)
+    matricul_eleve VARCHAR(20), -- Renommé de eleve pour la cohérence
+    annee_code VARCHAR(10), -- Renommé de annee pour la cohérence
+    decision VARCHAR(10) NOT NULL CHECK (decision IN ('Admis', 'Refusé', 'Passage')), -- Ajout de 'Passage'
+    rang INTEGER NOT NULL CHECK (rang >= 1),
+    mga FLOAT NOT NULL CHECK (mga >= 0 AND mga <= 10),
+    PRIMARY KEY (matricul_eleve, annee_code),
+    CONSTRAINT fk_resultat_eleve FOREIGN KEY (matricul_eleve) REFERENCES eleves(matricul) ON DELETE CASCADE,
+    CONSTRAINT fk_resultat_annee FOREIGN KEY (annee_code) REFERENCES anneescolaire(code_anne) ON DELETE RESTRICT
+);
+
+-- Note sur les index : PostgreSQL crée automatiquement des index pour les clés primaires et les clés étrangères.
+-- Les index explicites que vous aviez dans votre script initial sont donc généralement redondants.
