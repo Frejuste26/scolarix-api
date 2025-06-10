@@ -1,6 +1,6 @@
 // Importe l'objet 'db' qui contient l'instance Sequelize et tous les modèles
 import { db } from "../Models/index.js";
-import Validator from "../Middlewares/Validator.js";
+import Validator from "../Middlewares/validator.js"; // Changed Validator.js to validator.js
 // Importe l'instance unique du logger, comme suggéré précédemment
 import logger from '../Utils/Logger.js';
 import ErrorResponse from '../Utils/errorResponse.js';
@@ -9,7 +9,7 @@ class AnneeScolaireController {
   constructor() {
     this.model = db.AnneeScolaire; // Accède au modèle via l'objet 'db'
     this.validator = Validator;
-    
+
   }
 
   /**

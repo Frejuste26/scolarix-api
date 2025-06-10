@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 // Importe l'objet 'db' qui contient l'instance Sequelize et tous les modèles
 import { db } from '../Models/index.js';
 import AuthMiddleware from '../Middlewares/authMiddleware.js';
-import Validator from '../Middlewares/Validator.js';
+import Validator from '../Middlewares/validator.js'; // Changed Validator.js to validator.js
 // Importe l'instance unique du logger, comme suggéré précédemment
 import logger from '../Utils/Logger.js';
 import ErrorResponse from '../Utils/errorResponse.js';
@@ -11,7 +11,7 @@ import APIFeatures from '../Utils/apiFeatures.js';
 class UserController {
   constructor() {
     this.model = db.User;
-    this.models = db; 
+    this.models = db;
     this.validator = Validator;
     this.middleware = AuthMiddleware;
   }

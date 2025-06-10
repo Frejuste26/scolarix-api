@@ -10,7 +10,7 @@ import CompositionController from '../Controllers/composition.js';
 import NoteController from '../Controllers/note.js';
 import MoyenneController from '../Controllers/moyenne.js';
 import ResultatController from '../Controllers/resultat.js';
-import Validator from '../Middlewares/Validator.js';
+import Validator from '../Middlewares/validator.js'; // Changed Validator.js to validator.js
 import { db } from '../Models/index.js'; // Importe l'objet 'db' qui contient tous les modèles
 
 const router = express.Router();

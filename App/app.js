@@ -175,8 +175,9 @@ class App {
 
       if (ENABLE_CLUSTER && cluster.isPrimary) {
         this.runCluster();
+        // server instance is not directly available in cluster primary
       } else {
-        await this.runServer();
+        this.server = await this.runServer(); // Store the server instance
       }
     } catch (error) {
       logger.fatal('Échec du démarrage de l\'application en raison d\'une erreur critique.', {
